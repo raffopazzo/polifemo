@@ -6,10 +6,10 @@
 using namespace cv;
 using namespace std;
 
-Mat blur(const Mat& img) {
+Mat blur(const Mat& img, int factor) {
   Mat res;
   res.create(img.size(), img.type());
-  GaussianBlur(img, res, Size_<int>{23, 23}, 23);
+  GaussianBlur(img, res, Size{factor, factor}, factor);
   return res;
 }
 
@@ -50,70 +50,55 @@ int q(Mat img, uchar th) {
   return (res*100)/(img.rows*img.cols);
 }
 
-int main(int argc, char **argv) {
-  if (argc == 2) {
-    cout << " Usage: display_image ImageToLoadAndDisplay" << endl;
-
-    Mat image { imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE) };   // Read the file
-
-    if (!image.data) {                              // Check for invalid input
-      cout <<  "Could not open or find the image" << std::endl;
-      return -1;
-    }
-
-    namedWindow("image", WINDOW_NORMAL); // Create a window for display.
-    imshow("image", image);                   // Show our image inside it.
-
-    namedWindow("blur(image)", WINDOW_NORMAL); // Create a window for display.
-    imshow("blur(image)", blur(image));                   // Show our image inside it.
-
-    Rect_<int> rect{1000,500,1200,500} ;
-
-    namedWindow("edge(blur(image))", WINDOW_NORMAL); // Create a window for display.
-    imshow("edge(blur(image))", mark(edge(blur(image)),
-                                     rect,
-                                     255));                   // Show our image inside it.
-    Mat roi{image, rect};
-
-    namedWindow("ROI", WINDOW_NORMAL); // Create a window for display.
-    imshow("ROI", roi);
-
-    cout << "q(e)=" << q(roi, 255/4) << endl;
-    waitKey(0);                                          // Wait for a keystroke in the window
-  } else {
-    VideoCapture cap(0); // open the video camera no. 0
-
-    if (!cap.isOpened())  // if not success, exit program
-    {
-      cout  << "Cannot open the video file" << endl;
-      return -1;
-    }
-
-    double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
-    double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT); //get the height of frames of the  video
-    cout << "Frame size : " << dWidth << " x " << dHeight << endl;
-    
-    namedWindow("MyVideo",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
-    namedWindow("MyVideo2",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
-
-    Mat bw;
-    do {
-      Mat frame;
-      if (! cap.read(frame)) //if not success, break loop
-      {
-        cout << "Cannot read a frame from video file" << endl;
-        return -1;
+struct config {
+  explicit config(int argc, char **argv) {
+    for (int i=1; i<argc; ++i) {
+      int t1, t2, t3, t4;
+      if (4 == sscanf(argv[i], "--roi=%d,%dx%d,%d", &t1, &t2, &t3, &t4)) {
+        roi.x = t1;
+        roi.y = t2;
+        roi.width = t3;
+        roi.height = t4;
+      } else if (1 == sscanf(argv[i], "--blur=%d", &t1)) {
+        blur = t1;
+      } else if (1 == sscanf(argv[i], "--q=%d", &t1)) {
+        q = t1;
+      } else {
+        cerr << "Invalid argument " << argv[i] << endl;
+        throw std::runtime_error("There is some invalid argument");
       }
-      cvtColor(frame, bw, CV_BGR2GRAY);
-
-      Rect_<int> rect{0,0,400,200};
-
-//    Mat roi{blur(frame), rect};
-      Mat roi{edge(blur(bw)), rect};
-      cout << "q(roi)=" << q(roi, 4) << endl;
-      imshow("MyVideo", roi); //show the frame in "MyVideo" window
-    } while (waitKey(30) < 0);
+    }
   }
+  Rect roi{0, 0, 640, 480};
+  int blur {23};
+  int q {10};
+};
+
+int main(int argc, char **argv) {
+  config cfg{argc, argv};
+
+  VideoCapture cap(0);
+
+  if ( ! cap.isOpened()) {
+    cout  << "Cannot open the video file" << endl;
+    return -1;
+  }
+
+  namedWindow("video", CV_WINDOW_AUTOSIZE);
+
+  Mat bw;
+  do {
+    Mat frame;
+    if ( ! cap.read(frame)) {
+      cout << "Cannot read a frame from video file" << endl;
+      return -1;
+    }
+    cvtColor(frame, bw, CV_BGR2GRAY);
+
+    Mat roi{edge(blur(bw, cfg.blur)), cfg.roi};
+    cout << "q(roi)=" << q(roi, cfg.q) << endl;
+    imshow("video", roi);
+  } while (waitKey(30) < 0);
 
   return 0;
 }
