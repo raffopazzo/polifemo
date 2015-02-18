@@ -1,0 +1,14 @@
+aclocal.m4
+compile
+depcomp
+install-sh
+missing
+polifemo.vpj
+polifemo.vpw
+polifemo.vpwhistu
+polifemo.vtg
+autom4te.cache
+build
+config.h.in
+configure
+Makefile.in
