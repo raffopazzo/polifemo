@@ -9,8 +9,7 @@ using namespace std;
 Mat blur(const Mat& img) {
   Mat res;
   res.create(img.size(), img.type());
-//GaussianBlur(img, res, Size_<int>{23, 23}, 5);
-  GaussianBlur(img, res, Size_<int>{5, 5}, 5);
+  GaussianBlur(img, res, Size_<int>{23, 23}, 23);
   return res;
 }
 
@@ -24,10 +23,16 @@ Mat edge(const Mat& img) {
   return res;
 }
 
-Mat mark(Mat img) {
-  for (int i=0; i<img.rows; ++i) {
-    uchar *p = img.ptr<uchar>(i);
-    p[i] = 255;
+template<typename T>
+Mat mark(Mat img, Rect_<T> rect, const uchar color = 0) {
+  for (int i = 0; i < rect.height; ++i) {
+    img.ptr<uchar>(rect.y + i, rect.x)[0] = color;
+    img.ptr<uchar>(rect.y + i, rect.x + rect.width)[0] = color;
+  }
+  uchar *top_row = img.ptr<uchar>(rect.y);
+  uchar *bot_row = img.ptr<uchar>(rect.y + rect.height);
+  for (int i = 0; i < rect.width; ++i) {
+    top_row[rect.x + i] = bot_row[rect.x + i] = color;
   }
   return img;
 }
@@ -62,10 +67,18 @@ int main(int argc, char **argv) {
     namedWindow("blur(image)", WINDOW_NORMAL); // Create a window for display.
     imshow("blur(image)", blur(image));                   // Show our image inside it.
 
-    namedWindow("edge(blur(image))", WINDOW_NORMAL); // Create a window for display.
-    imshow("edge(blur(image))", edge(blur(image)));                   // Show our image inside it.
+    Rect_<int> rect{1000,500,1200,500} ;
 
-    cout << "q(e)=" << q(blur(image), 255/4) << endl;
+    namedWindow("edge(blur(image))", WINDOW_NORMAL); // Create a window for display.
+    imshow("edge(blur(image))", mark(edge(blur(image)),
+                                     rect,
+                                     255));                   // Show our image inside it.
+    Mat roi{image, rect};
+
+    namedWindow("ROI", WINDOW_NORMAL); // Create a window for display.
+    imshow("ROI", roi);
+
+    cout << "q(e)=" << q(roi, 255/4) << endl;
     waitKey(0);                                          // Wait for a keystroke in the window
   } else {
     VideoCapture cap(0); // open the video camera no. 0
@@ -79,23 +92,27 @@ int main(int argc, char **argv) {
     double dWidth = cap.get(CV_CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
     double dHeight = cap.get(CV_CAP_PROP_FRAME_HEIGHT); //get the height of frames of the  video
     cout << "Frame size : " << dWidth << " x " << dHeight << endl;
+    
     namedWindow("MyVideo",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
+    namedWindow("MyVideo2",CV_WINDOW_AUTOSIZE); //create a window called "MyVideo"
 
-    while (true) {
+    Mat bw;
+    do {
       Mat frame;
       if (! cap.read(frame)) //if not success, break loop
       {
         cout << "Cannot read a frame from video file" << endl;
         return -1;
       }
+      cvtColor(frame, bw, CV_BGR2GRAY);
 
-      imshow("MyVideo", frame); //show the frame in "MyVideo" window
-      if (waitKey(30) > 0) 
-      {
-        cout << "esc key is pressed by user" << endl;
-        break; 
-      }
-    }
+      Rect_<int> rect{0,0,400,200};
+
+//    Mat roi{blur(frame), rect};
+      Mat roi{edge(blur(bw)), rect};
+      cout << "q(roi)=" << q(roi, 4) << endl;
+      imshow("MyVideo", roi); //show the frame in "MyVideo" window
+    } while (waitKey(30) < 0);
   }
 
   return 0;
