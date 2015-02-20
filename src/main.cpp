@@ -7,10 +7,14 @@ using namespace cv;
 using namespace std;
 
 Mat blur(const Mat& img, int factor) {
-  Mat res;
-  res.create(img.size(), img.type());
-  GaussianBlur(img, res, Size{factor, factor}, factor);
-  return res;
+  if (factor) {
+    Mat res;
+    res.create(img.size(), img.type());
+    GaussianBlur(img, res, Size{factor, factor}, factor);
+    return res;
+  } else {
+    return img;
+  }
 }
 
 Mat edge(const Mat& img) {
@@ -63,6 +67,8 @@ struct config {
         blur = t1;
       } else if (1 == sscanf(argv[i], "--q=%d", &t1)) {
         q = t1;
+      } else if (1 == sscanf(argv[i], "--calibrate=%d", &t1)) {
+        calibrate = (t1 != 0);
       } else {
         cerr << "Invalid argument " << argv[i] << endl;
         throw std::runtime_error("There is some invalid argument");
@@ -72,6 +78,7 @@ struct config {
   Rect roi{0, 0, 640, 480};
   int blur {23};
   int q {10};
+  bool calibrate{false};
 };
 
 int main(int argc, char **argv) {
@@ -95,9 +102,14 @@ int main(int argc, char **argv) {
     }
     cvtColor(frame, bw, CV_BGR2GRAY);
 
-    Mat roi{edge(blur(bw, cfg.blur)), cfg.roi};
-    cout << "q(roi)=" << q(roi, cfg.q) << endl;
-    imshow("video", roi);
+    Mat img{blur(bw, cfg.blur)};
+    if (cfg.calibrate) {
+        imshow("video", mark(img, cfg.roi, 255));
+    } else {
+        Mat roi{edge(img), cfg.roi};
+        cout << "q(roi)=" << q(roi, cfg.q) << endl;
+        imshow("video", roi);
+    }
   } while (waitKey(30) < 0);
 
   return 0;
